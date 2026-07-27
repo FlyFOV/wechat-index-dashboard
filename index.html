@@ -691,7 +691,7 @@ function renderChangeLeaderboard() {
 // ========== Search ==========
 const resultsDiv = document.getElementById("searchResults");
 
-function searchKeyword() {
+async function searchKeyword() {
   const kw = document.getElementById("keywordInput").value.trim();
   if (!kw) {
     resultsDiv.style.display = "block";
@@ -699,58 +699,92 @@ function searchKeyword() {
     return;
   }
 
+  // 显示加载状态
+  resultsDiv.style.display = "block";
+  resultsDiv.innerHTML = `<span style="color:var(--text-secondary);">⏳ 正在搜索「<b>${kw}</b>」...</span>`;
+
+  // 优先调用后端 API
+  if (apiAvailable) {
+    try {
+      const resp = await fetch(`${API_BASE}/api/stocks/search?q=${encodeURIComponent(kw)}&limit=20`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.stocks && data.stocks.length > 0) {
+          renderSearchResults(data.stocks, kw, true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("[Search] API 搜索失败，回退本地:", e);
+    }
+  }
+
+  // 回退：本地静态数据搜索
   const results = wechatHotStocks.filter(s =>
     s.name.includes(kw) || s.code.includes(kw) || s.reason.includes(kw)
   );
-
   if (results.length > 0) {
-    resultsDiv.style.display = "block";
-    resultsDiv.innerHTML = `
-      <div style="font-weight:600;margin-bottom:10px;color:var(--primary);">🔍 找到 <b>${results.length}</b> 个与「${kw}」相关的股票：</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        ${results.map(s => {
-          const zdfSign = s.zdf > 0 ? "+" : "";
-          const zdfColor = s.zdf > 0 ? "var(--red)" : s.zdf < 0 ? "var(--green)" : "#999";
-          const arrow = s.zdf > 0 ? "📈" : "📉";
-          return `<div class="clickable" data-stock-code="${s.code}" title="点击查看历史趋势" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;border-radius:8px;border:1px solid var(--border);">
-            <div>
-              <strong>${s.name}</strong>
-              <span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">${s.code}</span>
-              <span class="badge ${s.type==='hk'?'badge-hkshare':'badge-ashare'}" style="margin-left:6px;">${s.type==='hk'?'港股':'A股'}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:16px;">
-              <span style="font-size:13px;">🔥 微信指数 <b style="color:var(--primary);">${(s.pv/10000).toFixed(1)}万</b></span>
-              <span style="font-weight:700;color:${zdfColor};">${arrow} ${zdfSign}${s.zdf.toFixed(2)}%</span>
-            </div>
-          </div>`;
-        }).join("")}
-      </div>`;
+    const mapped = results.map(s => ({
+      code: s.code, name: s.name, market: s.type === "hk" ? "港股" : "A股",
+      price: null, change_pct: s.zdf
+    }));
+    renderSearchResults(mapped, kw, false);
   } else {
-    // Check sector keywords
+    // 概念关键词匹配
     const sectorMatches = {
       "脑机接口": "板块涨5.17%，微信端搜索量激增。热门股：创新医疗(涨停)、爱朋医疗(20CM涨停)",
       "PCB": "PCB概念走强，中国巨石涨停、景旺电子涨停、金安国纪涨停",
       "创新药": "创新药持续强势，板块涨3.45%。哈三联4天3板，海南海药4天2板",
       "电池": "电池板块涨4.13%。宁德时代涨4.44%，欣旺达涨6.86%",
       "AI算力": "国内算力建设持续火热。腾讯云Q4上线NPO超级节点，北京新增智能算力5万P",
-      "长鑫科技": "今日科创板上市，涨465.82%，成交1411.9亿，A股新市值一哥！",
-      "宁德时代": "涨4.44%，披露A股史上最大回购(200-400亿)，上半年净利增42%",
       "存储芯片": "长鑫科技上市虹吸效应，兆易创新跌5.03%，雅克科技涨停"
     };
     const matched = Object.entries(sectorMatches).find(([k]) => k.includes(kw) || kw.includes(k));
     if (matched) {
-      resultsDiv.style.display = "block";
       resultsDiv.innerHTML = `
         <div style="font-weight:600;margin-bottom:8px;color:var(--primary);">📊 板块概念「${matched[0]}」：</div>
         <div style="padding:10px 14px;background:#fff;border-radius:8px;border:1px solid var(--border);line-height:1.6;">${matched[1]}</div>
-        <div style="margin-top:8px;font-size:12px;color:var(--text-secondary);">⚠️ 微信指数官方数据存在1-2天延迟，以上为当日市场综合信息</div>`;
+        <div style="margin-top:8px;font-size:12px;color:var(--text-secondary);">💡 更多股票请通过后端 API 搜索（需部署 Render 后端）</div>`;
     } else {
-      resultsDiv.style.display = "block";
       resultsDiv.innerHTML = `
-        <span style="color:var(--text-secondary);">❌ 未找到「<b>${kw}</b>」的微信指数数据</span>
-        <div style="margin-top:8px;font-size:12px;color:var(--text-secondary);">💡 微信指数每日更新可能存在1-2天延迟，建议尝试搜索板块概念词或热门股票名称</div>`;
+        <span style="color:var(--text-secondary);">❌ 未找到「<b>${kw}</b>」</span>
+        <div style="margin-top:8px;font-size:12px;color:var(--text-secondary);">💡 试试搜索股票名称或代码，如"茅台"、"腾讯"、"600519"、"00700"</div>`;
     }
   }
+}
+
+function renderSearchResults(stocks, query, fromAPI) {
+  const dataSource = fromAPI
+    ? '<span style="font-size:11px;background:#eafaf1;color:#27ae60;padding:1px 8px;border-radius:10px;margin-left:8px;">🟢 实时数据</span>'
+    : '<span style="font-size:11px;background:#fef9e7;color:#f39c12;padding:1px 8px;border-radius:10px;margin-left:8px;">🔶 静态缓存</span>';
+
+  resultsDiv.innerHTML = `
+    <div style="font-weight:600;margin-bottom:10px;color:var(--primary);">
+      🔍 找到 <b>${stocks.length}</b> 个与「${query}」相关的股票${dataSource}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:500px;overflow-y:auto;">
+      ${stocks.map(s => {
+        const chg = s.change_pct;
+        const zdfSign = (chg || 0) > 0 ? "+" : "";
+        const zdfColor = (chg || 0) > 0 ? "var(--red)" : (chg || 0) < 0 ? "var(--green)" : "#999";
+        const arrow = (chg || 0) > 0 ? "📈" : (chg || 0) < 0 ? "📉" : "";
+        const isHK = s.code.startsWith("hk");
+        const priceStr = s.price != null ? `¥${s.price.toFixed(2)}` : "—";
+        return `<div class="clickable" data-stock-code="${s.code}" title="点击查看详情" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;border-radius:8px;border:1px solid var(--border);">
+          <div>
+            <strong>${s.name}</strong>
+            <span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">${s.code}</span>
+            <span class="badge ${isHK?'badge-hkshare':'badge-ashare'}" style="margin-left:6px;">${isHK?'港股':'A股'}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <span style="font-size:14px;font-weight:600;">${priceStr}</span>
+            ${chg != null ? `<span style="font-weight:700;color:${zdfColor};">${arrow} ${zdfSign}${chg.toFixed(2)}%</span>` : '<span style="color:#999;">—</span>'}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
 }
 
 function quickSearch(kw) {
@@ -1086,12 +1120,56 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("searchBtn").addEventListener("click", searchKeyword);
 
   // Delegated click: any element with data-stock-code opens the stock detail modal
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     const el = e.target.closest("[data-stock-code]");
     if (!el) return;
     const code = el.getAttribute("data-stock-code");
-    const stock = wechatHotStocks.find(s => s.code === code);
-    if (stock) showStockDetail(stock);
+
+    // 先检查本地数据
+    let stock = wechatHotStocks.find(s => s.code === code);
+    if (stock) {
+      showStockDetail(stock);
+      return;
+    }
+
+    // 如果后端可用，尝试拉取实时数据
+    if (apiAvailable) {
+      try {
+        const resp = await fetch(`${API_BASE}/api/stocks/quote/${code}`, {
+          signal: AbortSignal.timeout(5000)
+        });
+        if (resp.ok) {
+          const q = await resp.json();
+          stock = {
+            code: q.code,
+            name: q.name,
+            market: q.market || (q.code.startsWith("hk") ? "港股" : "A股"),
+            zdf: q.change_pct || 0,
+            pv: 0,
+            type: q.code.startsWith("hk") ? "hk" : "as",
+            reason: "实时查询"
+          };
+          showStockDetail(stock);
+          return;
+        }
+      } catch (err) {
+        console.warn("[Detail] API 查询失败:", err);
+      }
+    }
+
+    // 回退：用 stock_symbols 信息构造基础信息
+    const nameEl = el.querySelector("strong");
+    const name = nameEl ? nameEl.textContent : code;
+    stock = {
+      code: code,
+      name: name,
+      market: code.startsWith("hk") ? "港股" : "A股",
+      zdf: 0,
+      pv: 0,
+      type: code.startsWith("hk") ? "hk" : "as",
+      reason: ""
+    };
+    showStockDetail(stock);
   });
 });
 
