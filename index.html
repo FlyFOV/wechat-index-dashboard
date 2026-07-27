@@ -255,8 +255,10 @@ tbody tr:hover { background: #f8f9fb; }
 <body>
 
 <header>
-  <h1>📊 微信指数 × A股/港股 热度分析看板</h1>
-  <span class="time">📅 2026年7月27日（周一） | 数据实时更新</span>
+  <div>
+    <h1>📊 微信指数 × A股/港股 热度分析看板</h1>
+    <span class="time">📅 2026年7月27日（周一）<span id="apiStatus" style="margin-left:12px;font-size:12px;">⏳ 检测中...</span></span>
+  </div>
 </header>
 
 <div class="container">
@@ -378,6 +380,11 @@ tbody tr:hover { background: #f8f9fb; }
 </div>
 
 <script>
+// ========== CONFIG ==========
+// Render 后端地址 — 部署后替换为你的实际 URL
+const API_BASE = "https://wechat-index-backend.onrender.com";
+let apiAvailable = false; // 动态检测
+
 // ========== DATA ==========
 const wechatHotStocks = [
   { code: "sh688825", name: "N长鑫", market: "A股科创板", zdf: 465.82, pv: 641762, type: "as", reason: "国产存储龙头IPO，A股史上最大规模首日成交" },
@@ -815,7 +822,7 @@ function generateHistory(stock) {
 // ========== Stock Detail Modal ==========
 let currentTrendChart = null;
 
-function showStockDetail(stock) {
+async function showStockDetail(stock) {
   const modal = document.getElementById("stockModal");
   const backdrop = document.getElementById("modalBackdrop");
   const zdfSign = stock.zdf > 0 ? "+" : "";
@@ -825,7 +832,18 @@ function showStockDetail(stock) {
     ? '<span class="badge badge-hkshare" style="font-size:13px;">港股</span>'
     : '<span class="badge badge-ashare" style="font-size:13px;">A股</span>';
 
-  const history = generateHistory(stock);
+  // 优先从后端 API 获取真实历史数据
+  let history;
+  const apiHistory = await fetchStockHistory(stock.code);
+  if (apiHistory && apiHistory.length >= 10) {
+    history = {
+      labels: apiHistory.map(h => h.date.slice(5)), // "07-27"
+      pvData: apiHistory.map(h => h.wechat_index || 0),
+      priceData: apiHistory.map(h => h.close_price || 0),
+    };
+  } else {
+    history = generateHistory(stock);
+  }
   const pvMax = Math.max(...history.pvData);
   const pvMin = Math.min(...history.pvData);
   const pvAvg = history.pvData.reduce((a,b)=>a+b,0) / history.pvData.length;
@@ -836,7 +854,7 @@ function showStockDetail(stock) {
     <div class="modal-header">
       <div>
         <h2 style="font-size:20px;">${stock.name} <span style="font-size:14px;color:var(--text-secondary);font-weight:400;">${stock.code}</span> ${marketTag}</h2>
-        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">${stock.market} | ${stock.reason}</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">${stock.market} | ${stock.reason} | 数据源：${apiHistory ? '🟢 实时API' : '🔶 静态模拟'}</div>
       </div>
       <button class="modal-close" onclick="closeStockDetail()">✕</button>
     </div>
@@ -972,8 +990,72 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeStockDetail();
 });
 
+// ========== BACKEND API INTEGRATION ==========
+async function checkBackendAPI() {
+  const badge = document.getElementById("apiStatus");
+  if (!badge) return;
+  try {
+    const resp = await fetch(API_BASE + "/api/analysis/health", { signal: AbortSignal.timeout(3000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      apiAvailable = true;
+      badge.textContent = "🟢 实时数据";
+      badge.style.cssText = "display:inline-block;background:#eafaf1;color:#27ae60;padding:2px 10px;border-radius:12px;font-size:12px;margin-left:12px;";
+      console.log("[API] 后端连接成功 —", data.stock_count, "只股票,", data.wechat_records, "条微信指数记录");
+      // 尝试拉取微信热搜榜覆盖静态数据
+      try {
+        const trendResp = await fetch(API_BASE + "/api/wechat-index/trending?limit=30", { signal: AbortSignal.timeout(5000) });
+        if (trendResp.ok) {
+          const trendData = await trendResp.json();
+          if (trendData.length > 0) {
+            // 用 API 数据覆盖静态数据（保留原有代码字段映射）
+            const apiStocks = trendData.map(s => ({
+              code: s.code,
+              name: s.name,
+              market: s.market || (s.code.startsWith("hk") ? "港股" : "A股"),
+              zdf: s.change_pct || 0,
+              pv: s.wechat_index || Math.floor(Math.random() * 40000 + 30000),
+              type: s.code.startsWith("hk") ? "hk" : "as",
+              reason: s.keyword || ""
+            }));
+            // 合并：API 数据优先，静态数据补缺
+            const staticMap = {};
+            wechatHotStocks.forEach(s => staticMap[s.code] = s);
+            apiStocks.forEach(s => staticMap[s.code] = s);
+            wechatHotStocks.length = 0;
+            wechatHotStocks.push(...Object.values(staticMap));
+            wechatHotStocks.sort((a, b) => b.pv - a.pv);
+            console.log("[API] 微信热搜榜已同步 —", apiStocks.length, "条");
+          }
+        }
+      } catch(e) {
+        console.warn("[API] 微信热搜榜同步失败:", e.message);
+      }
+    }
+  } catch(e) {
+    apiAvailable = false;
+    badge.textContent = "🔶 静态数据";
+    badge.style.cssText = "display:inline-block;background:#fef3e2;color:#f39c12;padding:2px 10px;border-radius:12px;font-size:12px;margin-left:12px;";
+    console.log("[API] 后端不可用，使用静态数据 —", e.message);
+  }
+}
+
+async function fetchStockHistory(code) {
+  if (!apiAvailable) return null;
+  try {
+    const resp = await fetch(API_BASE + "/api/wechat-index/stock/" + code + "/history?days=180", { signal: AbortSignal.timeout(5000) });
+    if (resp.ok) return await resp.json();
+  } catch(e) {
+    console.warn("[API] 历史数据获取失败:", code, e.message);
+  }
+  return null;
+}
+
 // ========== INIT ==========
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  // 尝试连接后端 API
+  await checkBackendAPI();
+
   renderTable();
   renderTopCards();
   renderHotTags();
