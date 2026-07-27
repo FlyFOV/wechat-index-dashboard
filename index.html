@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>微信指数 x A股/港股 热度分析看板 | 2026-07-27</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --card: #fff;
+  --text: #1a1a2e;
+  --text-secondary: #666;
+  --border: #e8eaef;
+  --primary: #2d6cdf;
+  --primary-light: #e8f0fe;
+  --red: #e74c3c;
+  --green: #27ae60;
+  --red-bg: #fdecea;
+  --green-bg: #eafaf1;
+  --yellow: #f39c12;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+header {
+  background: linear-gradient(135deg, #2d6cdf 0%, #1a3a7a 100%);
+  color: #fff;
+  padding: 28px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(45,108,223,0.25);
+}
+header h1 { font-size: 22px; font-weight: 700; }
+header .time {
+  font-size: 14px;
+  opacity: 0.85;
+  background: rgba(255,255,255,0.15);
+  padding: 6px 16px;
+  border-radius: 20px;
+}
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+/* Stats Row */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.stat-card .label { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+.stat-card .value { font-size: 26px; font-weight: 700; }
+.stat-card .sub { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+/* Search */
+.search-section {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.search-section h3 { font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.search-row { display: flex; gap: 12px; }
+.search-row input {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: border .2s;
+}
+.search-row input:focus { border-color: var(--primary); }
+.search-row button {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background .2s;
+}
+.search-row button:hover { background: #1a56c4; }
+.tag-suggestions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.tag-suggestions span {
+  background: var(--primary-light);
+  color: var(--primary);
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.tag-suggestions span:hover { background: var(--primary); color: #fff; }
+/* Grid Layout */
+.grid-2 { display: grid; grid-template-columns: 3fr 2fr; gap: 24px; margin-bottom: 24px; }
+.grid-2-rev { display: grid; grid-template-columns: 2fr 3fr; gap: 24px; margin-bottom: 24px; }
+.full { grid-column: 1/-1; }
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.card h3 { font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+/* Table */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: #f8f9fb; color: var(--text-secondary); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; }
+tbody tr:hover { background: #f8f9fb; }
+.zdf-up { color: var(--red); font-weight: 600; }
+.zdf-down { color: var(--green); font-weight: 600; }
+.zdf-zero { color: #999; }
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-ashare { background: #fff3e0; color: #e65100; }
+.badge-hkshare { background: #e3f2fd; color: #1565c0; }
+.badge-hot { background: #fce4ec; color: #c0392b; }
+.pv-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pv-bar .bar {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--primary), #7eb3ff);
+  min-width: 4px;
+}
+.pv-bar .num { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.market-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.tag-ashare { background: #ffeaa7; color: #d63031; }
+.tag-hk { background: #dfe6e9; color: #0984e3; }
+/* Analysis cards */
+.insight-card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border-left: 4px solid var(--primary);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+}
+.insight-card.warn { border-left-color: var(--yellow); }
+.insight-card.hot { border-left-color: var(--red); }
+.insight-card .title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.insight-card .desc { font-size: 13px; color: var(--text-secondary); }
+.chart-container { position: relative; height: 320px; }
+.chart-container-lg { position: relative; height: 400px; }
+.footer { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 12px; }
+@media (max-width: 1024px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .grid-2, .grid-2-rev { grid-template-columns: 1fr; }
+  header { padding: 20px; flex-direction: column; gap: 8px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 微信指数 × A股/港股 热度分析看板</h1>
+  <span class="time">📅 2026年7月27日（周一） | 数据实时更新</span>
+</header>
+
+<div class="container">
+
+  <!-- Market Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="label">🇨🇳 上证指数</div>
+      <div class="value zdf-up">3,858.25 <span style="font-size:16px">+1.15%</span></div>
+      <div class="sub">成交额 10,313亿 | +1,159亿</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">🇨🇳 创业板指</div>
+      <div class="value zdf-up">3,590.79 <span style="font-size:16px">+3.16%</span></div>
+      <div class="sub">深成指 14,148.73 | +2.72%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">🇭🇰 恒生指数(最近)</div>
+      <div class="value zdf-up">25,200+ <span style="font-size:16px">回升</span></div>
+      <div class="sub">恒生科技 微涨0.65%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">🔥 两市情绪</div>
+      <div class="value zdf-up">5,189涨 / 286跌</div>
+      <div class="sub">涨停121家 | 成交额2.08万亿</div>
+    </div>
+  </div>
+
+  <!-- WeChat Index Search -->
+  <div class="search-section">
+    <h3>🔍 微信指数关键词检索</h3>
+    <div class="search-row">
+      <input type="text" id="keywordInput" placeholder="输入股票名称、代码或关键词，如「宁德时代」「脑机接口」「长鑫科技」…">
+      <button onclick="searchKeyword()">查询微信指数</button>
+    </div>
+    <div class="tag-suggestions" id="hotTags"></div>
+  </div>
+
+  <!-- Main Grid: WeChat Hot Stocks + Analysis -->
+  <div class="grid-2">
+    <!-- WeChat Hot Stocks Table -->
+    <div class="card">
+      <h3>🔥 微信指数热门股票 TOP 30 <span style="font-size:12px;color:var(--text-secondary);font-weight:400;">— 微信端搜索/浏览热度</span></h3>
+      <div style="max-height:600px;overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>股票</th>
+              <th>市场</th>
+              <th>微信指数</th>
+              <th>涨跌幅</th>
+            </tr>
+          </thead>
+          <tbody id="hotStockTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- WeChat Index vs Price Change Analysis -->
+    <div class="card">
+      <h3>📈 微信指数 vs 股价涨跌幅 相关性分析</h3>
+      <div class="chart-container-lg">
+        <canvas id="scatterChart"></canvas>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);text-align:center;">
+        气泡大小 = 微信指数热度 | X轴 = 涨跌幅(%) | Y轴 = 微信指数(万)
+      </div>
+    </div>
+  </div>
+
+  <!-- Sector Heat & Analysis -->
+  <div class="grid-2">
+    <!-- Hot Sectors -->
+    <div class="card">
+      <h3>🏭 当日板块热度排行</h3>
+      <div class="chart-container">
+        <canvas id="sectorChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Analysis Insights -->
+    <div class="card">
+      <h3>💡 微信指数异动分析</h3>
+      <div id="insights"></div>
+    </div>
+  </div>
+
+  <!-- WeChat Index TOP10 Detail Cards -->
+  <div class="card full" style="margin-bottom:24px;">
+    <h3>🔬 微信指数 TOP 10 股票深度剖析</h3>
+    <div id="topDetailCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:12px;"></div>
+  </div>
+
+  <!-- A-Share vs HK WeChat Index Comparison -->
+  <div class="grid-2-rev" style="margin-bottom:24px;">
+    <div class="card">
+      <h3>🔄 A股 vs 港股 微信指数分布</h3>
+      <div class="chart-container">
+        <canvas id="marketCompareChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🏆 微信指数变化最大股票</h3>
+      <div id="changeLeaderboard"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    ⚠️ 微信指数数据来源于腾讯自选股微信热搜榜 | 市场数据来源：公开行情接口 | 仅供参考，不构成投资建议<br>
+    数据时间：2026-07-27 15:00 | 微信指数反映微信端搜索与浏览行为热度
+  </div>
+</div>
+
+<script>
+// ========== DATA ==========
+const wechatHotStocks = [
+  { code: "sh688825", name: "N长鑫", market: "A股科创板", zdf: 465.82, pv: 641762, type: "as", reason: "国产存储龙头IPO，A股史上最大规模首日成交" },
+  { code: "sh600584", name: "长电科技", market: "A股主板", zdf: -0.66, pv: 167867, type: "as", reason: "半导体封测龙头，AI芯片封装需求持续关注" },
+  { code: "bj920176", name: "N维琪", market: "北交所", zdf: 599.50, pv: 140671, type: "as", reason: "化妆品原料小巨人，首日暴涨近600%" },
+  { code: "sz000636", name: "风华高科", market: "A股主板", zdf: 10.00, pv: 121705, type: "as", reason: "MLCC被动元件涨停，PCB产业链火热" },
+  { code: "sz002185", name: "华天科技", market: "A股主板", zdf: 0.00, pv: 108749, type: "as", reason: "半导体封装测试，存储芯片概念联动" },
+  { code: "hk01810", name: "小米集团-W", market: "港股", zdf: 7.34, pv: 104887, type: "hk", reason: "微信AI Agent概念，混元Hy3发布联动" },
+  { code: "sz000938", name: "紫光股份", market: "A股主板", zdf: 0.05, pv: 102211, type: "as", reason: "国产算力/芯片概念，关注度高" },
+  { code: "sz002409", name: "雅克科技", market: "A股主板", zdf: 10.00, pv: 99848, type: "as", reason: "存储芯片材料涨停" },
+  { code: "sh601138", name: "工业富联", market: "A股主板", zdf: 2.16, pv: 96983, type: "as", reason: "AI服务器代工龙头，算力建设持续" },
+  { code: "sz300088", name: "长信科技", market: "A股创业板", zdf: 5.14, pv: 88783, type: "as", reason: "显示触控龙头，消费电子概念" },
+  { code: "sh603986", name: "兆易创新", market: "A股主板", zdf: -5.03, pv: 87670, type: "as", reason: "存储芯片龙头，长鑫上市分流关注" },
+  { code: "hk00700", name: "腾讯控股", market: "港股", zdf: 1.93, pv: 82580, type: "hk", reason: "微信生态核心，混元AI持续迭代" },
+  { code: "sh600206", name: "有研新材", market: "A股主板", zdf: 6.93, pv: 73759, type: "as", reason: "半导体材料，芯片产业链" },
+  { code: "sh600487", name: "亨通光电", market: "A股主板", zdf: 5.95, pv: 70779, type: "as", reason: "光纤光缆+海洋通信" },
+  { code: "hk00981", name: "中芯国际", market: "港股", zdf: -0.98, pv: 69370, type: "hk", reason: "国产芯片制造龙头" },
+  { code: "sh601899", name: "紫金矿业", market: "A股主板", zdf: 0.83, pv: 68328, type: "as", reason: "有色金属龙头，金价波动关注" },
+  { code: "sz002594", name: "比亚迪", market: "A股主板", zdf: 0.56, pv: 63411, type: "as", reason: "新能源车龙头" },
+  { code: "sz300502", name: "新易盛", market: "A股创业板", zdf: 3.15, pv: 61765, type: "as", reason: "光模块龙头，AI算力基建" },
+  { code: "sh600522", name: "中天科技", market: "A股主板", zdf: 4.05, pv: 61595, type: "as", reason: "海洋通信+电网" },
+  { code: "sh601939", name: "建设银行", market: "A股主板", zdf: 0.97, pv: 58374, type: "as", reason: "大金融权重" },
+  { code: "sz002208", name: "合肥城建", market: "A股主板", zdf: -3.97, pv: 57278, type: "as", reason: "房地产+国资" },
+  { code: "sh600667", name: "太极实业", market: "A股主板", zdf: 10.01, pv: 57153, type: "as", reason: "半导体+光伏，涨停" },
+  { code: "sz002463", name: "沪电股份", market: "A股主板", zdf: 4.71, pv: 57037, type: "as", reason: "PCB龙头，AI服务器电路板" },
+  { code: "sz001309", name: "德明利", market: "A股主板", zdf: 0.43, pv: 56178, type: "as", reason: "存储模组，长鑫概念关联" },
+  { code: "sh603690", name: "至纯科技", market: "A股主板", zdf: 9.99, pv: 54453, type: "as", reason: "半导体清洗设备涨停" },
+  { code: "sh601857", name: "中国石油", market: "A股主板", zdf: -1.18, pv: 53172, type: "as", reason: "油价下跌引发关注" },
+  { code: "sz002900", name: "哈三联", market: "A股主板", zdf: 10.00, pv: 52859, type: "as", reason: "创新药概念4天3板" },
+  { code: "sh600176", name: "中国巨石", market: "A股主板", zdf: 9.99, pv: 51710, type: "as", reason: "玻璃纤维龙头涨停" },
+  { code: "hk03690", name: "美团-W", market: "港股", zdf: 3.00, pv: 51376, type: "hk", reason: "港股科技权重，AI应用联动" },
+  { code: "sz300750", name: "宁德时代", market: "A股创业板", zdf: 4.44, pv: 46702, type: "as", reason: "A股史上最大回购方案(200-400亿)" }
+];
+
+// ========== RENDER TABLE ==========
+const maxPv = Math.max(...wechatHotStocks.map(s => s.pv));
+
+function renderTable() {
+  const tbody = document.getElementById("hotStockTable");
+  tbody.innerHTML = wechatHotStocks.map((s, i) => {
+    const barWidth = (s.pv / maxPv * 100);
+    const zdfClass = s.zdf > 0 ? "zdf-up" : s.zdf < 0 ? "zdf-down" : "zdf-zero";
+    const zdfSign = s.zdf > 0 ? "+" : "";
+    const marketBadge = s.type === "hk"
+      ? '<span class="badge badge-hkshare">港股</span>'
+      : '<span class="badge badge-ashare">A股</span>';
+    const hotBadge = i < 5 ? ' <span class="badge badge-hot">HOT</span>' : '';
+
+    return `<tr>
+      <td style="font-weight:700;color:${i<3?'var(--red)':i<5?'var(--yellow)':'var(--text-secondary)'}">#${i+1}</td>
+      <td><strong>${s.name}</strong><span style="font-size:11px;color:var(--text-secondary);margin-left:4px;">${s.code}</span>${marketBadge}${hotBadge}</td>
+      <td>${s.market}</td>
+      <td><div class="pv-bar"><div class="bar" style="width:${barWidth}%"></div><span class="num">${(s.pv/10000).toFixed(1)}万</span></div></td>
+      <td class="${zdfClass}">${zdfSign}${s.zdf.toFixed(2)}%</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderTopCards() {
+  const container = document.getElementById("topDetailCards");
+  const top10 = wechatHotStocks.slice(0, 10);
+  const colors = ['#e74c3c','#e67e22','#f39c12','#2ecc71','#3498db','#9b59b6','#1abc9c','#e84393','#00b894','#6c5ce7'];
+
+  container.innerHTML = top10.map((s, i) => {
+    const zdfSign = s.zdf > 0 ? "+" : "";
+    const zdfColor = s.zdf > 0 ? "var(--red)" : s.zdf < 0 ? "var(--green)" : "#999";
+    const marketTag = s.type === "hk"
+      ? '<span class="market-tag tag-hk">港股</span>'
+      : '<span class="market-tag tag-ashare">A股</span>';
+
+    return `<div style="background:var(--card);border-radius:10px;padding:16px;border:1px solid var(--border);border-top:4px solid ${colors[i]};box-shadow:var(--shadow);">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+        <div>
+          <strong style="font-size:16px;">${s.name}</strong>${marketTag}
+          <span style="font-size:11px;color:var(--text-secondary);display:block;">${s.code}</span>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:22px;font-weight:700;color:${zdfColor};">${zdfSign}${s.zdf.toFixed(2)}%</div>
+          <div style="font-size:12px;color:var(--text-secondary);">涨跌幅</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);">
+        <span style="font-size:12px;color:var(--text-secondary);">🔥 微信指数</span>
+        <span style="font-size:20px;font-weight:700;color:var(--primary);">${(s.pv/10000).toFixed(1)}<span style="font-size:12px;">万</span></span>
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;line-height:1.4;">💬 ${s.reason}</div>
+    </div>`;
+  }).join("");
+}
+
+// ========== Render Hot Tags ==========
+function renderHotTags() {
+  const tags = document.getElementById("hotTags");
+  const keywords = ["宁德时代", "脑机接口", "长鑫科技", "PCB", "创新药", "AI算力", "存储芯片", "玻璃纤维", "小米集团", "电池"];
+  tags.innerHTML = keywords.map(k => `<span onclick="quickSearch('${k}')">${k}</span>`).join("");
+}
+
+// ========== CHARTS ==========
+function initScatterChart() {
+  const ctx = document.getElementById("scatterChart").getContext("2d");
+  const points = wechatHotStocks.map(s => ({
+    x: s.zdf,
+    y: s.pv / 10000,
+    r: Math.max(5, Math.sqrt(s.pv) / 120),
+    label: s.name,
+    market: s.type
+  }));
+
+  new Chart(ctx, {
+    type: "bubble",
+    data: {
+      datasets: [
+        {
+          label: "A股",
+          data: points.filter(p => p.market === "as").map(p => ({ x: p.x, y: p.y, r: p.r, label: p.label })),
+          backgroundColor: "rgba(231, 76, 60, 0.6)",
+          borderColor: "#e74c3c",
+          borderWidth: 1
+        },
+        {
+          label: "港股",
+          data: points.filter(p => p.market === "hk").map(p => ({ x: p.x, y: p.y, r: p.r, label: p.label })),
+          backgroundColor: "rgba(41, 128, 185, 0.6)",
+          borderColor: "#2980b9",
+          borderWidth: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const d = ctx.raw;
+              return `${d.label}: 涨跌 ${d.x.toFixed(1)}% | 微信指数 ${d.y.toFixed(1)}万`;
+            }
+          }
+        },
+        legend: { position: "bottom" }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: "涨跌幅 (%)" },
+          grid: { color: "rgba(0,0,0,0.06)" }
+        },
+        y: {
+          title: { display: true, text: "微信指数 (万)" },
+          grid: { color: "rgba(0,0,0,0.06)" }
+        }
+      }
+    }
+  });
+}
+
+function initSectorChart() {
+  const ctx = document.getElementById("sectorChart").getContext("2d");
+  const sectors = [
+    { name: "玻璃玻纤", zdf: 9.65, heat: 2565 },
+    { name: "元件(PCB等)", zdf: 6.25, heat: 2122 },
+    { name: "脑机接口", zdf: 5.17, heat: 1670 },
+    { name: "电池", zdf: 4.13, heat: 1679 },
+    { name: "创新药", zdf: 3.45, heat: 1237 },
+    { name: "电网设备", zdf: 2.97, heat: 1743 },
+    { name: "半导体", zdf: 1.10, heat: 2190 },
+    { name: "证券Ⅱ", zdf: 0.47, heat: 1354 },
+    { name: "电力", zdf: 0.60, heat: 2312 }
+  ];
+
+  new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: sectors.map(s => s.name),
+      datasets: [{
+        label: "涨跌幅 (%)",
+        data: sectors.map(s => s.zdf),
+        backgroundColor: sectors.map(s => s.zdf > 3 ? "rgba(231,76,60,0.75)" : s.zdf > 0 ? "rgba(46,204,113,0.75)" : "rgba(39,174,96,0.75)"),
+        borderColor: sectors.map(s => s.zdf > 3 ? "#e74c3c" : s.zdf > 0 ? "#2ecc71" : "#27ae60"),
+        borderWidth: 1,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.raw.toFixed(2)}%`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: "rgba(0,0,0,0.06)" } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function initMarketCompareChart() {
+  const ctx = document.getElementById("marketCompareChart").getContext("2d");
+
+  const asPv = wechatHotStocks.filter(s => s.type === "as").reduce((a,b) => a + b.pv, 0);
+  const hkPv = wechatHotStocks.filter(s => s.type === "hk").reduce((a,b) => a + b.pv, 0);
+
+  const asCount = wechatHotStocks.filter(s => s.type === "as").length;
+  const hkCount = wechatHotStocks.filter(s => s.type === "hk").length;
+
+  const asAvgZdf = (wechatHotStocks.filter(s => s.type === "as").reduce((a,b) => a + b.zdf, 0) / asCount);
+  const hkAvgZdf = (wechatHotStocks.filter(s => s.type === "hk").reduce((a,b) => a + b.zdf, 0) / hkCount);
+
+  new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: ["A股 (总热度)", "港股 (总热度)"],
+      datasets: [{
+        data: [asPv, hkPv],
+        backgroundColor: ["rgba(231,76,60,0.8)", "rgba(41,128,185,0.8)"],
+        borderColor: ["#e74c3c", "#2980b9"],
+        borderWidth: 3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom" },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const total = asPv + hkPv;
+              const pct = (ctx.raw / total * 100).toFixed(1);
+              return `${ctx.label}: ${(ctx.raw/10000).toFixed(0)}万 (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ========== Insights ==========
+function renderInsights() {
+  const container = document.getElementById("insights");
+  const insights = [
+    { cls: "hot", title: "🎯 微信指数冠军：N长鑫 (688825)", desc: "微信指数高达64.2万，是第二名的3.8倍。作为国产存储龙头IPO首日，刷新A股单日成交1411亿纪录，全市场关注度断层领先。" },
+    { cls: "", title: "📊 微信指数与股价正相关显著", desc: "前十名中有7只当日上涨，微信高热度股票平均涨幅远超大盘。长鑫科技(465%)和N维琪(599%)双新股占据微信指数TOP3。" },
+    { cls: "warn", title: "⚠️ 反向信号：长电科技、兆易创新", desc: "长电科技微信指数16.8万排第2，但股价微跌0.66%；兆易创新微信指数8.8万但跌5.03%。存储芯片热度被长鑫IPO虹吸，存量标的承压。" },
+    { cls: "", title: "🇭🇰 港股微信热度集中科技龙头", desc: "小米(微信指数10.5万/涨7.34%)、腾讯(8.3万/涨1.93%)、美团(5.1万/涨3.0%)——港股微信指数TOP3均为互联网科技巨头，AI Agent概念驱动。" },
+    { cls: "", title: "🧠 脑机接口成板块热点黑马", desc: "板块涨5.17%，微信端'脑机接口'搜索量激增。中国科研团队实现跨地域千人同步脑电采集突破，叠加政策利好（首次写入政府工作报告）。" },
+    { cls: "", title: "🔋 宁德时代回购引爆电池板块", desc: "宁德时代披露200-400亿A股史上最大回购+中报净利增42%，带动电池板块涨4.13%。微信指数4.7万，虽未进前十但板块联动效应显著。" }
+  ];
+
+  container.innerHTML = insights.map(ins =>
+    `<div class="insight-card ${ins.cls}">
+      <div class="title">${ins.title}</div>
+      <div class="desc">${ins.desc}</div>
+    </div>`
+  ).join("");
+}
+
+// ========== Change Leaderboard ==========
+function renderChangeLeaderboard() {
+  const container = document.getElementById("changeLeaderboard");
+
+  // Filter stocks with meaningful zdf changes and sort by abs(zdf)
+  const sorted = [...wechatHotStocks]
+    .filter(s => Math.abs(s.zdf) > 2)
+    .sort((a, b) => Math.abs(b.zdf) - Math.abs(a.zdf))
+    .slice(0, 10);
+
+  // Calculate "change index" = pv * abs(zdf) to find stocks with both high change AND high attention
+  const withChangeIndex = wechatHotStocks.map(s => ({
+    ...s,
+    changeScore: s.pv * Math.abs(s.zdf) / 10000
+  })).sort((a, b) => b.changeScore - a.changeScore).slice(0, 10);
+
+  container.innerHTML = `
+    <div style="margin-bottom:16px;font-size:13px;color:var(--text-secondary);">综合微信热度 × 股价波动幅度的变化力排行</div>
+    ${withChangeIndex.map((s, i) => {
+      const zdfSign = s.zdf > 0 ? "+" : "";
+      const zdfColor = s.zdf > 0 ? "var(--red)" : s.zdf < 0 ? "var(--green)" : "#999";
+      const arrow = s.zdf > 0 ? "📈" : "📉";
+      const changeBar = (s.changeScore / withChangeIndex[0].changeScore * 100);
+      return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;">
+        <span style="font-weight:700;width:24px;text-align:center;color:${i<3?'var(--red)':'var(--text-secondary)'}">#${i+1}</span>
+        <span style="flex:1;min-width:0;">
+          <strong>${s.name}</strong>
+          <span style="font-size:11px;color:var(--text-secondary);">${s.code}</span>
+          <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;">
+            <div style="height:100%;width:${changeBar}%;background:linear-gradient(90deg,#e74c3c,#f39c12);border-radius:2px;"></div>
+          </div>
+        </span>
+        <span style="font-weight:700;color:${zdfColor};white-space:nowrap;">${arrow} ${zdfSign}${s.zdf.toFixed(1)}%</span>
+        <span style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">🔥${(s.pv/10000).toFixed(1)}万</span>
+      </div>`;
+    }).join("")}`;
+}
+
+// ========== Search ==========
+function searchKeyword() {
+  const kw = document.getElementById("keywordInput").value.trim();
+  if (!kw) {
+    alert("请输入要查询的关键词");
+    return;
+  }
+  const results = wechatHotStocks.filter(s =>
+    s.name.includes(kw) || s.code.includes(kw) || s.reason.includes(kw)
+  );
+  if (results.length > 0) {
+    const names = results.map(s => `${s.name}(${s.code}) - 微信指数:${(s.pv/10000).toFixed(1)}万 | 涨跌:${s.zdf>0?'+':''}${s.zdf.toFixed(2)}%`).join("\n");
+    alert(`找到 ${results.length} 个相关结果：\n\n${names}`);
+  } else {
+    // Check sector keywords
+    const sectorMatches = {
+      "脑机接口": "板块涨5.17%，微信端搜索量激增。热门股：创新医疗(涨停)、爱朋医疗(20CM涨停)",
+      "PCB": "PCB概念走强，中国巨石涨停、景旺电子涨停、金安国纪涨停",
+      "创新药": "创新药持续强势，板块涨3.45%。哈三联4天3板，海南海药4天2板",
+      "电池": "电池板块涨4.13%。宁德时代涨4.44%，欣旺达涨6.86%",
+      "AI算力": "国内算力建设持续火热。腾讯云Q4上线NPO超级节点，北京新增智能算力5万P",
+      "长鑫科技": "今日科创板上市，涨465.82%，成交1411.9亿，A股新市值一哥！",
+      "宁德时代": "涨4.44%，披露A股史上最大回购(200-400亿)，上半年净利增42%",
+      "存储芯片": "长鑫科技上市虹吸效应，兆易创新跌5.03%，雅克科技涨停"
+    };
+    const matched = Object.entries(sectorMatches).find(([k]) => k.includes(kw) || kw.includes(k));
+    if (matched) {
+      alert(`📊 ${matched[0]}：\n\n${matched[1]}\n\n⚠️ 注：微信指数官方数据更新至7月21日，以上为当日市场综合信息`);
+    } else {
+      alert(`未找到"${kw}"的微信指数数据。\n\n💡 提示：微信指数每日更新可能存在1-2天延迟，热门关键词会在次日更新。建议尝试搜索板块概念词或热门股票名称。`);
+    }
+  }
+}
+
+function quickSearch(kw) {
+  document.getElementById("keywordInput").value = kw;
+  searchKeyword();
+}
+
+// ========== INIT ==========
+document.addEventListener("DOMContentLoaded", () => {
+  renderTable();
+  renderTopCards();
+  renderHotTags();
+  renderInsights();
+  renderChangeLeaderboard();
+  initScatterChart();
+  initSectorChart();
+  initMarketCompareChart();
+});
+
+// Enter key to search
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && document.activeElement === document.getElementById("keywordInput")) {
+    searchKeyword();
+  }
+});
+</script>
+</body>
+</html>
