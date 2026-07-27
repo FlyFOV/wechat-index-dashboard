@@ -426,7 +426,7 @@ function renderTable() {
       : '<span class="badge badge-ashare">A股</span>';
     const hotBadge = i < 5 ? ' <span class="badge badge-hot">HOT</span>' : '';
 
-    return `<tr class="clickable" onclick="showStockDetail(wechatHotStocks[${i}])" title="点击查看历史趋势">
+    return `<tr class="clickable" data-stock-code="${s.code}" title="点击查看历史趋势">
       <td style="font-weight:700;color:${i<3?'var(--red)':i<5?'var(--yellow)':'var(--text-secondary)'}">#${i+1}</td>
       <td><strong>${s.name}</strong><span style="font-size:11px;color:var(--text-secondary);margin-left:4px;">${s.code}</span>${marketBadge}${hotBadge}</td>
       <td>${s.market}</td>
@@ -448,7 +448,7 @@ function renderTopCards() {
       ? '<span class="market-tag tag-hk">港股</span>'
       : '<span class="market-tag tag-ashare">A股</span>';
 
-    return `<div class="clickable" onclick="showStockDetail(wechatHotStocks[${i}])" title="点击查看历史趋势" style="background:var(--card);border-radius:10px;padding:16px;border:1px solid var(--border);border-top:4px solid ${colors[i]};box-shadow:var(--shadow);">
+    return `<div class="clickable" data-stock-code="${s.code}" title="点击查看历史趋势" style="background:var(--card);border-radius:10px;padding:16px;border:1px solid var(--border);border-top:4px solid ${colors[i]};box-shadow:var(--shadow);">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
         <div>
           <strong style="font-size:16px;">${s.name}</strong>${marketTag}
@@ -666,7 +666,7 @@ function renderChangeLeaderboard() {
       const zdfColor = s.zdf > 0 ? "var(--red)" : s.zdf < 0 ? "var(--green)" : "#999";
       const arrow = s.zdf > 0 ? "📈" : "📉";
       const changeBar = (s.changeScore / withChangeIndex[0].changeScore * 100);
-      return `<div class="clickable" onclick="showStockDetail(wechatHotStocks.find(x=>x.code==='${s.code}'))" title="点击查看历史趋势" style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;">
+      return `<div class="clickable" data-stock-code="${s.code}" title="点击查看历史趋势" style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px;">
         <span style="font-weight:700;width:24px;text-align:center;color:${i<3?'var(--red)':'var(--text-secondary)'}">#${i+1}</span>
         <span style="flex:1;min-width:0;">
           <strong>${s.name}</strong>
@@ -705,7 +705,7 @@ function searchKeyword() {
           const zdfSign = s.zdf > 0 ? "+" : "";
           const zdfColor = s.zdf > 0 ? "var(--red)" : s.zdf < 0 ? "var(--green)" : "#999";
           const arrow = s.zdf > 0 ? "📈" : "📉";
-          return `<div class="clickable" onclick="showStockDetail(wechatHotStocks[${wechatHotStocks.indexOf(s)}])" title="点击查看历史趋势" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;border-radius:8px;border:1px solid var(--border);">
+          return `<div class="clickable" data-stock-code="${s.code}" title="点击查看历史趋势" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;border-radius:8px;border:1px solid var(--border);">
             <div>
               <strong>${s.name}</strong>
               <span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">${s.code}</span>
@@ -1002,6 +1002,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Bind search button
   document.getElementById("searchBtn").addEventListener("click", searchKeyword);
+
+  // Delegated click: any element with data-stock-code opens the stock detail modal
+  document.addEventListener("click", (e) => {
+    const el = e.target.closest("[data-stock-code]");
+    if (!el) return;
+    const code = el.getAttribute("data-stock-code");
+    const stock = wechatHotStocks.find(s => s.code === code);
+    if (stock) showStockDetail(stock);
+  });
 });
 
 // Enter key to search
